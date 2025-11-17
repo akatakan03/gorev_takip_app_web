@@ -1,24 +1,21 @@
-// Gerekli 'import' (içeri aktarma) bildirimleri
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:gorev_takip_app_web/widgets/get_user_name.dart';
 import 'package:gorev_takip_app_web/widgets/edit_task_dialog.dart';
+import 'package:gorev_takip_app_web/widgets/request_revision_dialog.dart';
 
 class AllTasksPage extends StatelessWidget {
   const AllTasksPage({super.key});
 
-  // 'tasks' (görevler) koleksiyonunu dinleyen 'stream' (akış)
+  // 'stream' (akış)
   Stream<QuerySnapshot> _getTasksStream() {
-    // Adminin, 'archived' (arşivlendi) olanlar hariç tüm görevleri görmesini sağlıyoruz
     return FirebaseFirestore.instance
         .collection('tasks')
         .where('status', isNotEqualTo: 'archived')
         .snapshots();
-    // NOT: Bu sorgu için de bir Firebase Index (Dizin) gerekebilir.
-    // 'status' (durum) alanı için tek başına bir index (dizin) isteyebilir.
   }
 
-  // Durum ('status') renkleri (Aynen kaldı)
+  // Renk ve Metin fonksiyonları
   Color _getStatusColor(String status) {
     switch (status) {
       case 'pending':
@@ -34,7 +31,6 @@ class AllTasksPage extends StatelessWidget {
     }
   }
 
-  // Durum ('status') metinleri (Aynen kaldı)
   String _getTurkishStatus(String status) {
     switch (status) {
       case 'pending':
@@ -50,27 +46,106 @@ class AllTasksPage extends StatelessWidget {
     }
   }
 
-  // --- YENİ FONKSİYON: GÖREV DURUMUNU GÜNCELLEME ---
-  // Bu, çalışanın panelindekine benzer, ancak adminin
-  // 'revize' veya 'arşiv' yapabilmesi için.
-  Future<void> _updateTaskStatus(
+  // Revizyon diyaloğunu göster
+  Future<void> _showRequestRevisionDialog(
+      BuildContext context,
+      String taskId,
+      String taskTitle
+      ) async {
+    final String? revisionNote = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return RequestRevisionDialog(taskTitle: taskTitle);
+      },
+    );
+
+    if (revisionNote != null && context.mounted) {
+      _updateTaskWithRevision(context, taskId, taskTitle, revisionNote);
+    }
+  }
+
+  // Görevi revizyon notu ile güncelle
+  Future<void> _updateTaskWithRevision(
+      BuildContext context,
+      String taskId,
+      String taskTitle,
+      String revisionNote
+      ) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('tasks')
+          .doc(taskId)
+          .update({
+        'status': 'needs_revision',
+        'revision_note': revisionNote,
+      });
+
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('"$taskTitle" görevi revizyon için geri gönderildi.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      debugPrint("Görev revizyonu güncellenirken hata: $e");
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Hata: Revizyon gönderilemedi. $e'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
+
+  // Arşivleme onayı
+  Future<void> _showArchiveConfirmationDialog(
+      BuildContext context,
+      String taskId,
+      String taskTitle
+      ) async {
+    return showDialog<void>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Görevi Onayla ve Arşivle'),
+          content: Text(
+            '"$taskTitle" başlıklı görevi "Arşivlendi" olarak işaretlemek istediğinizden emin misiniz?\n\nBu görev, tüm aktif listelerden kaldırılacaktır.',
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('İptal'),
+              onPressed: () => Navigator.of(dialogContext).pop(),
+            ),
+            TextButton(
+              style: TextButton.styleFrom(foregroundColor: Colors.green),
+              child: const Text('Onayla ve Arşivle'),
+              onPressed: () {
+                _updateTaskStatus_Archive(context, taskId, 'archived', taskTitle);
+                Navigator.of(dialogContext).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Arşivleme için durum ('status') güncelleme
+  Future<void> _updateTaskStatus_Archive(
       BuildContext context,
       String taskId,
       String newStatus,
       String taskTitle
       ) async {
     try {
-      // Görevi bul ve 'status' (durum) alanını güncelle
       await FirebaseFirestore.instance
           .collection('tasks')
           .doc(taskId)
-          .update({
-        'status': newStatus,
-      });
+          .update({'status': newStatus});
 
-      // 'ScaffoldMessenger' (Cihaz Ekran Bildirimi) göstermek için
-      // 'context' (bağlam) değişkeninin 'mounted' (eklenti) olup olmadığını
-      // kontrol ediyoruz (iyi bir pratiktir).
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -90,46 +165,8 @@ class AllTasksPage extends StatelessWidget {
     }
   }
 
-  // --- YENİ FONKSİYON: ARŞİVLEME ONAY DİYALOĞU ---
-  // "Arşivle" butonu, görevi gizleyeceği için bir onay ister.
-  Future<void> _showArchiveConfirmationDialog(
-      BuildContext context,
-      String taskId,
-      String taskTitle
-      ) async {
-    return showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: const Text('Görevi Onayla ve Arşivle'),
-          content: Text(
-            '"$taskTitle" başlıklı görevi "Arşivlendi" olarak işaretlemek istediğinizden emin misiniz?\n\nBu görev, tüm aktif listelerden kaldırılacaktır.',
-          ),
-          actions: <Widget>[
-            TextButton(
-              child: const Text('İptal'),
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-              },
-            ),
-            // Onaylama Butonu
-            TextButton(
-              style: TextButton.styleFrom(foregroundColor: Colors.green),
-              child: const Text('Onayla ve Arşivle'),
-              onPressed: () {
-                // Görevin durumunu ('status') 'archived' (arşivlendi) olarak güncelle
-                _updateTaskStatus(context, taskId, 'archived', taskTitle);
-                Navigator.of(dialogContext).pop();
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // 'Edit' (Düzenle) ve 'Delete' (Sil) diyalogları (Aynen kaldı)
+  // --- HATA DÜZELTMESİ BURADA ---
+  // Düzenleme diyaloğunu göster
   Future<void> _showEditTaskDialog(
       BuildContext context, String taskId, Map<String, dynamic> taskData) async {
     return showDialog<void>(
@@ -138,12 +175,15 @@ class AllTasksPage extends StatelessWidget {
       builder: (BuildContext dialogContext) {
         return EditTaskDialog(
           taskId: taskId,
+          // Hata buradaydı: 'currentData:' yerine 'currentTaskData:' olmalı
           currentTaskData: taskData,
         );
       },
     );
   }
+  // --- DÜZELTME BİTTİ ---
 
+  // Silme onayı
   Future<void> _showDeleteTaskConfirmationDialog(
       BuildContext context, String taskId, String taskTitle) async {
     return showDialog<void>(
@@ -158,9 +198,7 @@ class AllTasksPage extends StatelessWidget {
           actions: <Widget>[
             TextButton(
               child: const Text('İptal'),
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-              },
+              onPressed: () => Navigator.of(dialogContext).pop(),
             ),
             TextButton(
               style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
@@ -176,6 +214,7 @@ class AllTasksPage extends StatelessWidget {
     );
   }
 
+  // Görevi sil
   Future<void> _deleteTask(
       String taskId, String taskTitle, BuildContext context) async {
     try {
@@ -196,7 +235,6 @@ class AllTasksPage extends StatelessWidget {
       );
     }
   }
-  // --- Fonksiyonlar burada bitiyor ---
 
   @override
   Widget build(BuildContext context) {
@@ -207,7 +245,7 @@ class AllTasksPage extends StatelessWidget {
         const Padding(
           padding: EdgeInsets.all(16.0),
           child: Text(
-            'Aktif Görevler (Admin Onayı)', // Başlığı güncelledik
+            'Aktif Görevler (Admin Onayı)',
             style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
           ),
         ),
@@ -222,12 +260,11 @@ class AllTasksPage extends StatelessWidget {
                 return const Center(child: CircularProgressIndicator());
               }
               if (snapshot.hasError) {
-                // Olası 'index' (dizin) hatası
                 return Center(
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Text(
-                      'Görevler yüklenemedi. (Firebase Index (Dizin) hatası olabilir, konsolu kontrol edin)\n\nHata: ${snapshot.error}',
+                      'Görevler yüklenemedi.\n\nHata: ${snapshot.error}',
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.redAccent),
                     ),
@@ -237,7 +274,7 @@ class AllTasksPage extends StatelessWidget {
               if (snapshot.hasData && snapshot.data!.docs.isEmpty) {
                 return const Center(
                   child: Text(
-                    'Sisteme kayıtlı aktif görev bulunamadı.', // Metni güncelledik
+                    'Sisteme kayıtlı aktif görev bulunamadı.',
                     style: TextStyle(fontSize: 16, color: Colors.grey),
                   ),
                 );
@@ -246,7 +283,7 @@ class AllTasksPage extends StatelessWidget {
               if (snapshot.hasData) {
                 final tasks = snapshot.data!.docs;
 
-                // 'GridView' (Izgara Görünümü) (Aynen kaldı)
+                // 'GridView' (Izgara Görünümü)
                 return GridView.builder(
                   padding: const EdgeInsets.all(16.0),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -288,7 +325,6 @@ class AllTasksPage extends StatelessWidget {
                               MainAxisAlignment.spaceBetween,
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Başlık
                                 Expanded(
                                   child: Text(
                                     taskTitle,
@@ -300,39 +336,29 @@ class AllTasksPage extends StatelessWidget {
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
-                                // --- GÜNCELLENEN KISIM: KART EYLEM BUTONLARI ---
-                                // Bu 'Row' (Satır), görevin durumuna ('status')
-                                // göre farklı ikonlar (icon) gösterecek
                                 Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    // EĞER DURUM 'completed' (TAMAMLANDI) İSE:
-                                    // Admin (Yönetici) onay butonlarını göster
                                     if (status == 'completed') ...[
-                                      // 'Revize İste' Butonu
                                       IconButton(
-                                        icon: const Icon(Icons.replay), // 'Geri Gönder' ikonu
+                                        icon: const Icon(Icons.replay),
                                         color: Colors.redAccent,
                                         tooltip: 'Revize İste',
                                         iconSize: 20,
                                         onPressed: () {
-                                          // Durumu ('status') 'needs_revision' (Revize Gerekli) yap
-                                          _updateTaskStatus(
+                                          _showRequestRevisionDialog(
                                             context,
                                             taskId,
-                                            'needs_revision',
                                             taskTitle,
                                           );
                                         },
                                       ),
-                                      // 'Onayla ve Arşivle' Butonu
                                       IconButton(
-                                        icon: const Icon(Icons.archive_outlined), // 'Arşiv' ikonu
+                                        icon: const Icon(Icons.archive_outlined),
                                         color: Colors.green,
                                         tooltip: 'Onayla ve Arşivle',
                                         iconSize: 20,
                                         onPressed: () {
-                                          // Arşivleme onayı sor
                                           _showArchiveConfirmationDialog(
                                             context,
                                             taskId,
@@ -341,10 +367,8 @@ class AllTasksPage extends StatelessWidget {
                                         },
                                       ),
                                     ]
-                                    // EĞER DURUM 'completed' (TAMAMLANDI) DEĞİLSE:
-                                    // Standart 'Düzenle' ve 'Sil' butonlarını göster
                                     else ...[
-                                      IconButton( // Düzenle Butonu
+                                      IconButton(
                                         icon:
                                         const Icon(Icons.edit_outlined),
                                         color: Colors.blueGrey,
@@ -358,7 +382,7 @@ class AllTasksPage extends StatelessWidget {
                                           );
                                         },
                                       ),
-                                      IconButton( // Sil Butonu
+                                      IconButton(
                                         icon:
                                         const Icon(Icons.delete_outline),
                                         color: Colors.redAccent,
@@ -375,7 +399,6 @@ class AllTasksPage extends StatelessWidget {
                                     ]
                                   ],
                                 )
-                                // --- GÜNCELLEME BİTTİ ---
                               ],
                             ),
 

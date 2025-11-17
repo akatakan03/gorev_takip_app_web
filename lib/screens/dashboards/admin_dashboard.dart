@@ -5,12 +5,14 @@ import 'package:gorev_takip_app_web/widgets/common_app_bar.dart';
 import 'package:gorev_takip_app_web/screens/dashboards/admin_pages/employee_list_page.dart';
 import 'package:gorev_takip_app_web/screens/dashboards/admin_pages/all_tasks_page.dart';
 import 'package:gorev_takip_app_web/screens/dashboards/admin_pages/reports_page.dart';
+// --- YENİ EKLENEN IMPORT ---
+import 'package:gorev_takip_app_web/screens/dashboards/admin_pages/archived_tasks_page.dart';
+// -----------------------------
+
 
 // Diyalogları (diyalog pencereleri) import et (içeri aktar)
 import 'package:gorev_takip_app_web/widgets/add_employee_dialog.dart';
-// --- YENİ EKLENEN IMPORT ---
 import 'package:gorev_takip_app_web/widgets/add_task_dialog.dart';
-// -----------------------------
 
 
 class AdminDashboard extends StatefulWidget {
@@ -23,12 +25,15 @@ class AdminDashboard extends StatefulWidget {
 class _AdminDashboardState extends State<AdminDashboard> {
   int _selectedIndex = 0; // Hangi sekmenin seçili olduğunu tutar
 
+  // --- GÜNCELLENEN SAYFA LİSTESİ ---
   // Gösterilecek sayfaların listesi
   static const List<Widget> _adminPages = <Widget>[
     EmployeeListPage(),   // Index 0
     AllTasksPage(),       // Index 1
     ReportsPage(),        // Index 2
+    ArchivedTasksPage(),  // Index 3 (YENİ EKLENDİ)
   ];
+  // ---------------------------------
 
   // Seçili Index'e (dizine) göre FAB (Kayan Düğme) döndüren fonksiyon
   Widget? _getFabForIndex(int index) {
@@ -39,7 +44,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
           icon: const Icon(Icons.person_add),
           label: const Text('Yeni Çalışan Ekle'),
           onPressed: () {
-            // 'add_employee_dialog.dart'ı (çalışan ekleme diyaloğu) aç
             showDialog(
               context: context,
               barrierDismissible: false,
@@ -55,23 +59,19 @@ class _AdminDashboardState extends State<AdminDashboard> {
         return FloatingActionButton.extended(
           icon: const Icon(Icons.add_task),
           label: const Text('Yeni Görev Ekle'),
-          backgroundColor: Colors.blueAccent, // Rengi farklı olsun
-          // --- GÜNCELLENEN KISIM ---
+          backgroundColor: Colors.blueAccent,
           onPressed: () {
-            // Yeni 'add_task_dialog.dart'ı (görev ekleme diyaloğu) aç
             showDialog(
               context: context,
               barrierDismissible: false,
               builder: (BuildContext context) {
-                // Yeni 'AddTaskDialog' widget'ımızı (bileşen) çağır
                 return const AddTaskDialog();
               },
             );
           },
         );
-    // -----------------------------
 
-    // Diğer sekmelerde (örn: Raporlar) FAB (Kayan Düğme) gösterme
+    // Diğer sekmelerde (Raporlar, Arşiv) FAB (Kayan Düğme) gösterme
       default:
         return null;
     }
@@ -83,7 +83,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       appBar: const CommonAppBar(title: 'Admin Paneli'),
       body: Row(
         children: <Widget>[
-          // Sol Navigasyon Menüsü (NavigationRail) (Aynen kaldı)
+          // --- GÜNCELLENEN NAVİGASYON MENÜSÜ ---
           NavigationRail(
             selectedIndex: _selectedIndex,
             onDestinationSelected: (int index) {
@@ -109,8 +109,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 selectedIcon: Icon(Icons.bar_chart),
                 label: Text('Raporlar'),
               ),
+              // --- YENİ EKLENEN SEKME ---
+              NavigationRailDestination(
+                icon: Icon(Icons.archive_outlined),
+                selectedIcon: Icon(Icons.archive),
+                label: Text('Arşiv'),
+              ),
+              // ---------------------------
             ],
           ),
+          // ---------------------------------
 
           const VerticalDivider(thickness: 1, width: 1),
 

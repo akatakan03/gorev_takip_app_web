@@ -16,38 +16,42 @@ class _MyTasksPageState extends State<MyTasksPage> {
   @override
   void initState() {
     super.initState();
-    // Mevcut kullanıcı kimliğini (ID) al
     currentUserId = FirebaseAuth.instance.currentUser!.uid;
   }
 
-  // Sadece bu çalışana atanan görevleri getiren 'stream' (akış)
+  // 'stream' (akış) (Aynen kaldı)
   Stream<QuerySnapshot> _getMyTasksStream() {
     return FirebaseFirestore.instance
         .collection('tasks')
-    // 'assignedTo' (atanan kişi) alanı 'currentUserId' (mevcut kullanıcı kimliği) olan
         .where('assignedTo', isEqualTo: currentUserId)
-    // VE 'status' (durum) alanı 'archived' (arşivlendi) olmayan
         .where('status', isNotEqualTo: 'archived')
         .snapshots();
-    // NOT: Bu birleşik sorgu (compound query) için Firebase'in
-    // bir 'index' (dizin) oluşturulmasını istemesi muhtemeldir.
-    // Hata alırsanız, konsoldaki linke tıklayarak 'index'i (dizin) oluşturun.
   }
 
-  // Görevin durumunu ('status') güncelleyen fonksiyon
-  // Bu fonksiyon zaten esnek olduğu için (yeni durumu 'newStatus'
-  // parametresiyle alır) değişikliğe gerek yok.
+  // --- GÜNCELLENEN FONKSİYON: DURUM GÜNCELLEME ---
   Future<void> _updateTaskStatus(
       String taskId, String newStatus, String taskTitle) async {
     try {
+      // Güncellenecek veriyi bir 'Map' (harita) olarak hazırla
+      Map<String, Object> dataToUpdate = {
+        'status': newStatus,
+      };
+
+      // Eğer çalışan görevi 'completed' (tamamlandı) olarak
+      // işaretliyorsa...
+      if (newStatus == 'completed') {
+        // 'completedAt' (tamamlanma tarihi) zaman damgası ekle
+        dataToUpdate['completedAt'] = FieldValue.serverTimestamp();
+        // VE Adminin (Yönetici) yazdığı 'revision_note' (revizyon notu)
+        // alanını sil (temizle).
+        dataToUpdate['revision_note'] = FieldValue.delete();
+      }
+
+      // Hazırladığımız 'Map' (harita) ile dokümanı güncelle
       await FirebaseFirestore.instance
           .collection('tasks')
           .doc(taskId)
-          .update({
-        'status': newStatus,
-        if (newStatus == 'completed')
-          'completedAt': FieldValue.serverTimestamp()
-      });
+          .update(dataToUpdate);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -70,7 +74,7 @@ class _MyTasksPageState extends State<MyTasksPage> {
     }
   }
 
-  // Durum ('status') renkleri (Aynen kaldı)
+  // Durum ('status') renk ve metin fonksiyonları (Aynen kaldı)
   Color _getStatusColor(String status) {
     switch (status) {
       case 'pending':
@@ -86,11 +90,10 @@ class _MyTasksPageState extends State<MyTasksPage> {
     }
   }
 
-  // Durum ('status') metinleri (Aynen kaldı)
   String _getTurkishStatus(String status) {
     switch (status) {
       case 'pending':
-        return 'Bekliyor'; // (Başlamadı)
+        return 'Bekliyor';
       case 'in_progress':
         return 'Devam Ediyor';
       case 'completed':
@@ -107,7 +110,7 @@ class _MyTasksPageState extends State<MyTasksPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Başlık (Aynen kaldı)
+        // Başlık
         const Padding(
           padding: EdgeInsets.all(16.0),
           child: Text(
@@ -116,14 +119,14 @@ class _MyTasksPageState extends State<MyTasksPage> {
           ),
         ),
 
-        // Görevleri listeleyen 'StreamBuilder' (Akış Oluşturucu)
+        // 'StreamBuilder' (Akış Oluşturucu)
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
             stream: _getMyTasksStream(),
             builder:
                 (BuildContext context, AsyncSnapshot<QuerySnapshot> snapshot) {
 
-              // Yüklenme, Hata ve Boş Liste durumları (Aynen kaldı)
+              // Yüklenme, Hata, Boş Liste durumları (Aynen kaldı)
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
@@ -132,7 +135,7 @@ class _MyTasksPageState extends State<MyTasksPage> {
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Text(
-                      'Görevler yüklenemedi. (Firebase Index (Dizin) hatası olabilir, konsolu kontrol edin)\n\nHata: ${snapshot.error}',
+                      'Görevler yüklenemedi.\n\nHata: ${snapshot.error}',
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.redAccent),
                     ),
@@ -167,7 +170,13 @@ class _MyTasksPageState extends State<MyTasksPage> {
                         : taskData['description'];
                     final String createdById = taskData['createdBy'] ?? '';
 
-                    // Görev Kartı (Card)
+                    // --- YENİ ALAN: REVİZYON NOTUNU AL ---
+                    // 'revision_note' (revizyon notu) alanını veritabanından çek.
+                    // Eğer 'null' (boş) değilse, 'revisionNote' (revizyon notu)
+                    // değişkenine ata.
+                    final String? revisionNote = taskData['revision_note'];
+                    // ------------------------------------
+
                     return Card(
                       shape: RoundedRectangleBorder(
                         side: BorderSide(
@@ -216,6 +225,51 @@ class _MyTasksPageState extends State<MyTasksPage> {
                                 ),
                               ],
                             ),
+
+                            // --- YENİ WIDGET (BİLEŞEN): REVİZYON NOTU ALANI ---
+                            // Eğer 'status' (durum) 'needs_revision' (Revize Gerekli)
+                            // ise ve 'revisionNote' (revizyon notu) 'null' (boş) değilse
+                            if ((status == 'needs_revision' || status == 'in_progress') && revisionNote != null)
+                              Container(
+                                width: double.infinity,
+                                margin: const EdgeInsets.only(top: 12.0),
+                                padding: const EdgeInsets.all(12.0),
+                                decoration: BoxDecoration(
+                                    color: Colors.red.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(4.0),
+                                    border: Border.all(color: Colors.redAccent)
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Row(
+                                      children: [
+                                        Icon(
+                                          Icons.warning_amber_rounded,
+                                          color: Colors.redAccent,
+                                          size: 18,
+                                        ),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          "Admin (Yönetici) Revizyon Notu:",
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.redAccent,
+                                            fontSize: 15,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      revisionNote, // Adminin (Yönetici) yazdığı not
+                                      style: const TextStyle(fontSize: 14),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            // ------------------------------------
+
                             const SizedBox(height: 12),
 
                             // 2. Satır: Açıklama (Aynen kaldı)
@@ -253,23 +307,18 @@ class _MyTasksPageState extends State<MyTasksPage> {
                               ],
                             ),
 
-                            // 4. Satır: Eylem Butonları
+                            // 4. Satır: Eylem Butonları (Aynen kaldı)
                             const Divider(height: 24),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.end,
                               children: [
-                                // --- GÜNCELLENEN EYLEM BÖLÜMÜ ---
-                                // Sizin akışınıza (flow) göre güncellendi.
-
-                                // Eğer durum 'pending' (bekliyor) VEYA
-                                // 'needs_revision' (revize gerekli) ise:
+                                // 'pending' (bekliyor) VEYA 'needs_revision' (revize gerekli) ise
                                 if (status == 'pending' || status == 'needs_revision')
                                   ElevatedButton(
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.blueAccent, // "Başla" butonu mavi
+                                      backgroundColor: Colors.blueAccent,
                                     ),
                                     onPressed: () {
-                                      // Durumu 'in_progress' (devam ediyor) yap
                                       _updateTaskStatus(
                                         taskId,
                                         'in_progress', // Yeni durum
@@ -279,14 +328,13 @@ class _MyTasksPageState extends State<MyTasksPage> {
                                     child: const Text('Çalışmaya Başla'),
                                   ),
 
-                                // Eğer durum 'in_progress' (devam ediyor) ise:
+                                // 'in_progress' (devam ediyor) ise
                                 if (status == 'in_progress')
                                   ElevatedButton(
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.green, // "Tamamla" butonu yeşil
+                                      backgroundColor: Colors.green,
                                     ),
                                     onPressed: () {
-                                      // Durumu 'completed' (tamamlandı) yap
                                       _updateTaskStatus(
                                         taskId,
                                         'completed', // Yeni durum
@@ -296,7 +344,7 @@ class _MyTasksPageState extends State<MyTasksPage> {
                                     child: const Text('Görevi Tamamla'),
                                   ),
 
-                                // Eğer durum 'completed' (tamamlandı) ise:
+                                // 'completed' (tamamlandı) ise
                                 if (status == 'completed')
                                   const Padding(
                                     padding: EdgeInsets.only(right: 8.0),
@@ -308,7 +356,6 @@ class _MyTasksPageState extends State<MyTasksPage> {
                                       ),
                                     ),
                                   ),
-                                // ---------------------------------
                               ],
                             )
                           ],
