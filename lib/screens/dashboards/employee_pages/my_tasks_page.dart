@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:gorev_takip_app_web/widgets/get_user_name.dart';
+import 'package:gorev_takip_app_web/widgets/task_detail_dialog.dart';
 
 class MyTasksPage extends StatefulWidget {
   const MyTasksPage({super.key});
@@ -19,7 +20,7 @@ class _MyTasksPageState extends State<MyTasksPage> {
     currentUserId = FirebaseAuth.instance.currentUser!.uid;
   }
 
-  // 'stream' (akış) (Aynen kaldı)
+  // Fonksiyonlar (Değişiklik yok)
   Stream<QuerySnapshot> _getMyTasksStream() {
     return FirebaseFirestore.instance
         .collection('tasks')
@@ -28,26 +29,18 @@ class _MyTasksPageState extends State<MyTasksPage> {
         .snapshots();
   }
 
-  // --- GÜNCELLENEN FONKSİYON: DURUM GÜNCELLEME ---
   Future<void> _updateTaskStatus(
       String taskId, String newStatus, String taskTitle) async {
     try {
-      // Güncellenecek veriyi bir 'Map' (harita) olarak hazırla
       Map<String, Object> dataToUpdate = {
         'status': newStatus,
       };
 
-      // Eğer çalışan görevi 'completed' (tamamlandı) olarak
-      // işaretliyorsa...
       if (newStatus == 'completed') {
-        // 'completedAt' (tamamlanma tarihi) zaman damgası ekle
         dataToUpdate['completedAt'] = FieldValue.serverTimestamp();
-        // VE Adminin (Yönetici) yazdığı 'revision_note' (revizyon notu)
-        // alanını sil (temizle).
         dataToUpdate['revision_note'] = FieldValue.delete();
       }
 
-      // Hazırladığımız 'Map' (harita) ile dokümanı güncelle
       await FirebaseFirestore.instance
           .collection('tasks')
           .doc(taskId)
@@ -74,7 +67,6 @@ class _MyTasksPageState extends State<MyTasksPage> {
     }
   }
 
-  // Durum ('status') renk ve metin fonksiyonları (Aynen kaldı)
   Color _getStatusColor(String status) {
     switch (status) {
       case 'pending':
@@ -105,12 +97,24 @@ class _MyTasksPageState extends State<MyTasksPage> {
     }
   }
 
+  Future<void> _showTaskDetailDialog(
+      BuildContext context, String taskId, Map<String, dynamic> taskData) async {
+    return showDialog<void>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return TaskDetailDialog(
+          taskId: taskId,
+          taskData: taskData,
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Başlık
         const Padding(
           padding: EdgeInsets.all(16.0),
           child: Text(
@@ -118,15 +122,11 @@ class _MyTasksPageState extends State<MyTasksPage> {
             style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
           ),
         ),
-
-        // 'StreamBuilder' (Akış Oluşturucu)
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
             stream: _getMyTasksStream(),
             builder:
                 (BuildContext context, AsyncSnapshot<QuerySnapshot> snapshot) {
-
-              // Yüklenme, Hata, Boş Liste durumları (Aynen kaldı)
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
@@ -151,9 +151,9 @@ class _MyTasksPageState extends State<MyTasksPage> {
                 );
               }
 
-              // Veri geldiyse Listeyi oluştur
               if (snapshot.hasData) {
                 final tasks = snapshot.data!.docs;
+
                 return ListView.builder(
                   padding: const EdgeInsets.all(16.0),
                   itemCount: tasks.length,
@@ -164,19 +164,10 @@ class _MyTasksPageState extends State<MyTasksPage> {
                     final String status = taskData['status'] ?? 'unknown';
                     final String taskTitle =
                         taskData['title'] ?? 'Başlıksız Görev';
-                    final String taskDescription =
-                    taskData['description']?.isEmpty ?? true
-                        ? "Açıklama yok."
-                        : taskData['description'];
+                    final String? revisionNote = taskData['revision_note'];
                     final String createdById = taskData['createdBy'] ?? '';
 
-                    // --- YENİ ALAN: REVİZYON NOTUNU AL ---
-                    // 'revision_note' (revizyon notu) alanını veritabanından çek.
-                    // Eğer 'null' (boş) değilse, 'revisionNote' (revizyon notu)
-                    // değişkenine ata.
-                    final String? revisionNote = taskData['revision_note'];
-                    // ------------------------------------
-
+                    // --- KART (CARD) İÇERİĞİ GÜNCELLENDİ ---
                     return Card(
                       shape: RoundedRectangleBorder(
                         side: BorderSide(
@@ -187,178 +178,190 @@ class _MyTasksPageState extends State<MyTasksPage> {
                       ),
                       elevation: 3,
                       margin: const EdgeInsets.only(bottom: 12.0),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // 1. Satır: Başlık ve Durum (Aynen kaldı)
-                            Row(
-                              mainAxisAlignment:
-                              MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    taskTitle,
-                                    style: const TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
+                      child: InkWell(
+                        onTap: () {
+                          _showTaskDetailDialog(context, taskId, taskData);
+                        },
+                        borderRadius: BorderRadius.circular(8.0),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // 1. Satır: Başlık ve Durum
+                              Row(
+                                mainAxisAlignment:
+                                MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      taskTitle,
+                                      style: const TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10.0, vertical: 5.0),
-                                  decoration: BoxDecoration(
-                                    color: _getStatusColor(status)
-                                        .withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(4.0),
-                                  ),
-                                  child: Text(
-                                    _getTurkishStatus(status).toUpperCase(),
-                                    style: TextStyle(
-                                      color: _getStatusColor(status),
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12,
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10.0, vertical: 5.0),
+                                    decoration: BoxDecoration(
+                                      color: _getStatusColor(status)
+                                          .withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(4.0),
+                                    ),
+                                    child: Text(
+                                      _getTurkishStatus(status).toUpperCase(),
+                                      style: TextStyle(
+                                        color: _getStatusColor(status),
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
+                                ],
+                              ),
 
-                            // --- YENİ WIDGET (BİLEŞEN): REVİZYON NOTU ALANI ---
-                            // Eğer 'status' (durum) 'needs_revision' (Revize Gerekli)
-                            // ise ve 'revisionNote' (revizyon notu) 'null' (boş) değilse
-                            if ((status == 'needs_revision' || status == 'in_progress') && revisionNote != null)
-                              Container(
-                                width: double.infinity,
-                                margin: const EdgeInsets.only(top: 12.0),
-                                padding: const EdgeInsets.all(12.0),
-                                decoration: BoxDecoration(
-                                    color: Colors.red.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(4.0),
-                                    border: Border.all(color: Colors.redAccent)
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Row(
-                                      children: [
-                                        Icon(
-                                          Icons.warning_amber_rounded,
-                                          color: Colors.redAccent,
-                                          size: 18,
-                                        ),
-                                        SizedBox(width: 8),
-                                        Text(
-                                          "Admin (Yönetici) Revizyon Notu:",
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
+                              // Revizyon Notu (Aynen kaldı)
+                              if ((status == 'needs_revision' || status == 'in_progress') &&
+                                  revisionNote != null)
+                                Container(
+                                  width: double.infinity,
+                                  margin: const EdgeInsets.only(top: 12.0),
+                                  padding: const EdgeInsets.all(12.0),
+                                  decoration: BoxDecoration(
+                                      color: Colors.red.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(4.0),
+                                      border: Border.all(color: Colors.redAccent)),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            status == 'in_progress'
+                                                ? Icons.info_outline
+                                                : Icons.warning_amber_rounded,
                                             color: Colors.redAccent,
-                                            fontSize: 15,
+                                            size: 18,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          const Text(
+                                            "Admin (Yönetici) Revizyon Notu:",
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.redAccent,
+                                              fontSize: 15,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(revisionNote,
+                                          style: const TextStyle(fontSize: 14)),
+                                    ],
+                                  ),
+                                ),
+
+                              const Divider(height: 24),
+
+                              // --- GÜNCELLENDİ: 3. Satır: Atayan ve Butonlar ---
+                              // 'Row' (Satır) yapısını mobil
+                              // taşmayı (`overflow`) (taşma) önleyecek
+                              // şekilde 'Flexible' (Esnek)
+                              // 'widget'lar (bileşen) ile güncelledik
+                              Row(
+                                mainAxisAlignment:
+                                MainAxisAlignment.spaceBetween,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  // Görevi Atayan (Esnek)
+                                  Flexible(
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                            Icons.admin_panel_settings_outlined,
+                                            size: 16,
+                                            color: Colors.grey),
+                                        const SizedBox(width: 8),
+                                        const Text(
+                                          "Atayan: ",
+                                          style: TextStyle(color: Colors.grey),
+                                        ),
+                                        // 'GetUserName' (Kullanıcı Adı Getir)
+                                        // 'widget'ı (bileşen) artık 'Expanded' (Genişletilmiş)
+                                        // içinde, böylece taşarsa kısaltılır.
+                                        Expanded(
+                                          child: GetUserName(
+                                            userId: createdById,
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
                                           ),
                                         ),
                                       ],
                                     ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      revisionNote, // Adminin (Yönetici) yazdığı not
-                                      style: const TextStyle(fontSize: 14),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            // ------------------------------------
-
-                            const SizedBox(height: 12),
-
-                            // 2. Satır: Açıklama (Aynen kaldı)
-                            Text(
-                              taskDescription,
-                              style: TextStyle(
-                                fontSize: 15,
-                                color: Colors.grey[400],
-                                fontStyle:
-                                taskData['description']?.isEmpty ?? true
-                                    ? FontStyle.italic
-                                    : FontStyle.normal,
-                              ),
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 16),
-
-                            // 3. Satır: Görevi Atayan (Aynen kaldı)
-                            Row(
-                              children: [
-                                const Icon(Icons.admin_panel_settings_outlined,
-                                    size: 16, color: Colors.grey),
-                                const SizedBox(width: 8),
-                                const Text(
-                                  "Atayan: ",
-                                  style: TextStyle(color: Colors.grey),
-                                ),
-                                GetUserName(
-                                  userId: createdById,
-                                  style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600),
-                                ),
-                              ],
-                            ),
-
-                            // 4. Satır: Eylem Butonları (Aynen kaldı)
-                            const Divider(height: 24),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                // 'pending' (bekliyor) VEYA 'needs_revision' (revize gerekli) ise
-                                if (status == 'pending' || status == 'needs_revision')
-                                  ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.blueAccent,
-                                    ),
-                                    onPressed: () {
-                                      _updateTaskStatus(
-                                        taskId,
-                                        'in_progress', // Yeni durum
-                                        taskTitle,
-                                      );
-                                    },
-                                    child: const Text('Çalışmaya Başla'),
                                   ),
 
-                                // 'in_progress' (devam ediyor) ise
-                                if (status == 'in_progress')
-                                  ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.green,
-                                    ),
-                                    onPressed: () {
-                                      _updateTaskStatus(
-                                        taskId,
-                                        'completed', // Yeni durum
-                                        taskTitle,
-                                      );
-                                    },
-                                    child: const Text('Görevi Tamamla'),
-                                  ),
-
-                                // 'completed' (tamamlandı) ise
-                                if (status == 'completed')
-                                  const Padding(
-                                    padding: EdgeInsets.only(right: 8.0),
-                                    child: Text(
-                                      'Admin Onayı Bekleniyor...',
-                                      style: TextStyle(
-                                        color: Colors.green,
-                                        fontStyle: FontStyle.italic,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            )
-                          ],
+                                  // Eylem Butonları
+                                  // (Bu 'Row' (Satır) 'widget'ı (bileşen)
+                                  // zaten kendi boyutunu bilir,
+                                  // 'Flexible' (Esnek) yapmaya gerek yok)
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      if (status == 'pending' ||
+                                          status == 'needs_revision')
+                                        ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.blueAccent,
+                                          ),
+                                          onPressed: () {
+                                            _updateTaskStatus(
+                                              taskId,
+                                              'in_progress',
+                                              taskTitle,
+                                            );
+                                          },
+                                          child:
+                                          const Text('Çalışmaya Başla'),
+                                        ),
+                                      if (status == 'in_progress')
+                                        ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.green,
+                                          ),
+                                          onPressed: () {
+                                            _updateTaskStatus(
+                                              taskId,
+                                              'completed',
+                                              taskTitle,
+                                            );
+                                          },
+                                          child: const Text('Görevi Tamamla'),
+                                        ),
+                                      if (status == 'completed')
+                                        const Padding(
+                                          padding:
+                                          EdgeInsets.only(right: 8.0),
+                                          child: Text(
+                                            'Admin Onayı Bekleniyor...',
+                                            style: TextStyle(
+                                              color: Colors.green,
+                                              fontStyle: FontStyle.italic,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  )
+                                ],
+                              )
+                              // --- GÜNCELLEME BİTTİ ---
+                            ],
+                          ),
                         ),
                       ),
                     );

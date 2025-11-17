@@ -1,33 +1,28 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:gorev_takip_app_web/widgets/get_user_name.dart';
-// Bu sayfada düzenleme veya silme olmayacak,
-// o yüzden diyalogları 'import' (içeri aktarma) etmemize gerek yok.
+// --- YENİ EKLENEN IMPORT ---
+// Arşivdeki görevlere de tıklayıp
+// detaylarını görebilmek için
+import 'package:gorev_takip_app_web/widgets/task_detail_dialog.dart';
+// -----------------------------
 
 class ArchivedTasksPage extends StatelessWidget {
   const ArchivedTasksPage({super.key});
 
-  // 'tasks' (görevler) koleksiyonunu dinleyen 'stream' (akış)
+  // 'stream' (akış) (Değişiklik yok)
   Stream<QuerySnapshot> _getArchivedTasksStream() {
-    // Bu 'stream' (akış), 'status' (durum) alanı 'archived' (arşivlendi)
-    // olan görevleri çeker.
     return FirebaseFirestore.instance
         .collection('tasks')
         .where('status', isEqualTo: 'archived')
         .snapshots();
-    // NOT: Bu sorgu için de Firebase'in yeni bir 'tek alanlı'
-    // (single-field) 'index' (dizin) oluşturmanızı istemesi muhtemeldir.
-    // Hata alırsanız, konsoldaki linke tıklayarak 'index'i (dizin) oluşturun.
   }
 
-  // --- Durum ('status') renkleri ve metinleri ---
-  // (all_tasks_page.dart (tüm görevler sayfası) içindekilerin aynısı,
-  // ama 'archived' (arşivlendi) için bir renk ekleyebiliriz)
+  // Renk ve Metin fonksiyonları (Değişiklik yok)
   Color _getStatusColor(String status) {
     if (status == 'archived') {
-      return Colors.grey[700]!; // Arşivlenmiş görevler için gri renk
+      return Colors.grey[700]!;
     }
-    // Diğer durumlar (her ihtimale karşı)
     switch (status) {
       case 'completed':
         return Colors.green;
@@ -47,14 +42,56 @@ class ArchivedTasksPage extends StatelessWidget {
         return 'Bilinmiyor';
     }
   }
-  // --- Fonksiyonlar burada bitiyor ---
+
+  // --- Yardımı Fonksiyonlar (YENİ EKLENDİ) ---
+  // (all_tasks_page.dart (tüm görevler sayfası)
+  // dosyasından kopyalandı)
+  int _calculateCrossAxisCount(double width) {
+    if (width < 600) {
+      return 1; // Mobil
+    } else if (width < 1000) {
+      return 2; // Tablet
+    } else {
+      return 3; // Desktop (Masaüstü)
+    }
+  }
+
+  double _calculateChildAspectRatio(double width) {
+    // --- DÜZELTME ---
+    // 'all_tasks_page.dart' (tüm görevler sayfası) ile
+    // tutarlı olması için mobil oranı 4.2'ye yükseltiyoruz.
+    if (width < 600) {
+      return 4.2; // 3.5'ten 4.2'ye yükseltildi
+    }
+    // ----------------
+    else if (width < 1000) {
+      return 2.5; // Tablet
+    } else {
+      return 2.2; // Desktop (Masaüstü)
+    }
+  }
+  // ------------------------------------------
+
+  // --- YENİ FONKSİYON: GÖREV DETAY DİYALOĞUNU GÖSTER ---
+  Future<void> _showTaskDetailDialog(
+      BuildContext context, String taskId, Map<String, dynamic> taskData) async {
+    return showDialog<void>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return TaskDetailDialog(
+          taskId: taskId,
+          taskData: taskData,
+        );
+      },
+    );
+  }
+  // ---------------------------------------------
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Başlık
         const Padding(
           padding: EdgeInsets.all(16.0),
           child: Text(
@@ -62,23 +99,20 @@ class ArchivedTasksPage extends StatelessWidget {
             style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
           ),
         ),
-
-        // 'StreamBuilder' (Akış Oluşturucu)
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
             stream: _getArchivedTasksStream(),
-            builder: (BuildContext context, AsyncSnapshot<QuerySnapshot> snapshot) {
-
+            builder:
+                (BuildContext context, AsyncSnapshot<QuerySnapshot> snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
               if (snapshot.hasError) {
-                // Olası 'index' (dizin) hatası
                 return Center(
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Text(
-                      'Görevler yüklenemedi. (Firebase Index (Dizin) hatası olabilir, konsolu kontrol edin)\n\nHata: ${snapshot.error}',
+                      'Görevler yüklenemedi.\n\nHata: ${snapshot.error}',
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.redAccent),
                     ),
@@ -97,117 +131,123 @@ class ArchivedTasksPage extends StatelessWidget {
               if (snapshot.hasData) {
                 final tasks = snapshot.data!.docs;
 
-                // 'GridView' (Izgara Görünümü)
-                return GridView.builder(
-                  padding: const EdgeInsets.all(16.0),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    crossAxisSpacing: 16.0,
-                    mainAxisSpacing: 16.0,
-                    childAspectRatio: 1.7, // Oran 'all_tasks_page' (tüm görevler sayfası) ile aynı
-                  ),
-                  itemCount: tasks.length,
-                  itemBuilder: (context, index) {
-                    final taskData =
-                    tasks[index].data() as Map<String, dynamic>;
-                    final String status = taskData['status'] ?? 'unknown';
-                    final String taskTitle =
-                        taskData['title'] ?? 'Başlıksız Görev';
-                    final String taskDescription =
-                    taskData['description']?.isEmpty ?? true
-                        ? "Açıklama yok."
-                        : taskData['description'];
+                // --- GÜNCELLENDİ: LayoutBuilder (Yerleşim Oluşturucu) Eklendi ---
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    final double width = constraints.maxWidth;
+                    final int crossAxisCount = _calculateCrossAxisCount(width);
+                    final double childAspectRatio =
+                    _calculateChildAspectRatio(width);
 
-                    return Card(
-                      shape: RoundedRectangleBorder(
-                        side: BorderSide(
-                          color: _getStatusColor(status),
-                          width: 4.0,
-                        ),
-                        borderRadius: BorderRadius.circular(8.0),
+                    return GridView.builder(
+                      padding: const EdgeInsets.all(16.0),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: crossAxisCount,
+                        crossAxisSpacing: 16.0,
+                        mainAxisSpacing: 16.0,
+                        childAspectRatio: childAspectRatio,
                       ),
-                      elevation: 4,
-                      child: Padding(
-                        padding: const EdgeInsets.all(12.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // 1. Satır: Sadece Başlık
-                            // (Arşivde Düzenle/Sil butonu yok)
-                            Expanded(
-                              flex: 2, // Başlığa biraz daha fazla yer ver
-                              child: Text(
-                                taskTitle,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
+                      itemCount: tasks.length,
+                      itemBuilder: (context, index) {
+                        final taskData =
+                        tasks[index].data() as Map<String, dynamic>;
+                        final taskId = tasks[index].id;
+                        final String status = taskData['status'] ?? 'unknown';
+                        final String taskTitle =
+                            taskData['title'] ?? 'Başlıksız Görev';
 
-                            // 2. Satır: Açıklama
-                            Expanded(
-                              flex: 3, // Açıklamaya daha fazla yer ver
-                              child: SingleChildScrollView(
-                                child: Text(
-                                  taskDescription,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey[400],
-                                    fontStyle:
-                                    taskData['description']?.isEmpty ??
-                                        true
-                                        ? FontStyle.italic
-                                        : FontStyle.normal,
-                                  ),
-                                ),
+                        // --- KART (CARD) İÇERİĞİ GÜNCELLENDİ ---
+                        return InkWell(
+                          onTap: () {
+                            _showTaskDetailDialog(context, taskId, taskData);
+                          },
+                          borderRadius: BorderRadius.circular(8.0),
+                          child: Card(
+                            shape: RoundedRectangleBorder(
+                              side: BorderSide(
+                                color: _getStatusColor(status),
+                                width: 4.0,
                               ),
+                              borderRadius: BorderRadius.circular(8.0),
                             ),
-                            const SizedBox(height: 8),
-
-                            // 3. Satır: Atanan Kişi ve Durum
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Icon(Icons.person_outline,
-                                        size: 16, color: Colors.grey),
-                                    const SizedBox(width: 8),
-                                    GetUserName(
-                                      userId: taskData['assignedTo'] ?? '',
-                                      style: const TextStyle(fontSize: 14),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8.0, vertical: 4.0),
-                                  decoration: BoxDecoration(
-                                    color: _getStatusColor(status)
-                                        .withOpacity(0.2),
-                                    borderRadius:
-                                    BorderRadius.circular(4.0),
-                                  ),
-                                  child: Text(
-                                    _getTurkishStatus(status).toUpperCase(),
-                                    style: TextStyle(
-                                      color: _getStatusColor(status),
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12,
+                            elevation: 4,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                              child: Column(
+                                crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                                children: [
+                                  // 1. Satır: Sadece Başlık
+                                  Expanded(
+                                    child: Text(
+                                      taskTitle,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
-                                ),
-                              ],
+
+                                  // Açıklama ('description') (açıklama) kaldırıldı
+                                  const Spacer(),
+
+                                  // Alt Kısım: Atanan Kişi ve Durum
+                                  Column(
+                                    crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.person_outline,
+                                              size: 14, color: Colors.grey),
+                                          const SizedBox(width: 6),
+                                          Expanded(
+                                            child: GetUserName(
+                                              userId:
+                                              taskData['assignedTo'] ?? '',
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Container(
+                                        padding:
+                                        const EdgeInsets.symmetric(
+                                            horizontal: 8.0,
+                                            vertical: 4.0),
+                                        decoration: BoxDecoration(
+                                          color: _getStatusColor(status)
+                                              .withOpacity(0.2),
+                                          borderRadius:
+                                          BorderRadius.circular(4.0),
+                                        ),
+                                        child: Text(
+                                          _getTurkishStatus(status)
+                                              .toUpperCase(),
+                                          style: TextStyle(
+                                            color: _getStatusColor(status),
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                      // TODO: Buraya "Arşivden Çıkar"
+                                      // butonu eklenebilir.
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
-                            // TODO: İstenirse buraya bir "Arşivden Çıkar"
-                            // (Unarchive) butonu eklenebilir.
-                          ],
-                        ),
-                      ),
+                          ),
+                        );
+                        // --- KART (CARD) GÜNCELLEMESİ BİTTİ ---
+                      },
                     );
                   },
                 );
