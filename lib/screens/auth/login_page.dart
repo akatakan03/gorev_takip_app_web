@@ -25,6 +25,9 @@ class _LoginPageState extends State<LoginPage> {
   bool _rememberMe = false;
   // -------------------------
 
+  // Şifrenin görünür olup olmadığını kontrol etmek için yeni state
+  bool _isPasswordVisible = false;
+
   // Giriş yapma fonksiyonu
   Future<void> _signIn() async {
     // Butonun "yükleniyor" durumuna geçmesini sağla
@@ -92,6 +95,99 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  // --- YENİ EKLENECEK FONKSİYON ---
+  Future<void> _resetPassword() async {
+    // 0. E-posta alanının dolu olup olmadığını kontrol et
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
+      setState(() {
+        _errorMessage =
+        'Şifrenizi sıfırlamak için lütfen e-posta alanını doldurun.';
+      });
+      return; // E-posta boşsa işlemi durdur
+    }
+
+    // 1. Kullanıcıdan onay iste (Senin istediğin diyalog)
+    final bool? didRequest = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false, // Dışarı tıklamayı engelle
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Şifre Sıfırlama'),
+          content: Text(
+            '"$email" adresine bir şifre sıfırlama e-postası gönderilsin mi?',
+          ),
+          actions: <Widget>[
+            // İptal butonu
+            TextButton(
+              child: const Text('İptal'),
+              onPressed: () {
+                // Diyaloğu kapatır ve 'false' (yanlış) değeri döndürür
+                Navigator.of(dialogContext).pop(false);
+              },
+            ),
+            // Gönder butonu
+            TextButton(
+              child: const Text('Gönder'),
+              onPressed: () {
+                // Diyaloğu kapatır ve 'true' (doğru) değeri döndürür
+                Navigator.of(dialogContext).pop(true);
+              },
+            ),
+          ],
+        );
+      },
+    );
+
+    // 2. Eğer kullanıcı "Gönder" demezse (veya iptal ederse) işlemi durdur
+    if (didRequest != true) {
+      return;
+    }
+
+    // 3. E-postayı gönderme işlemini başlat
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // Firebase'in e-posta gönderme fonksiyonunu çağır
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+
+      // İşlem başarılıysa...
+      if (mounted) {
+        setState(() {
+          _isLoading = false; // Yüklenmeyi durdur
+        });
+        // Başarı mesajı göster
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Sıfırlama e-postası gönderildi. Lütfen gelen kutunuzu (ve spam) kontrol edin.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      // Hata oluşursa
+      _errorMessage = _getErrorMessage(e.code);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      // Diğer hatalar
+      _errorMessage = 'Bilinmeyen bir hata oluştu.';
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+// --- YENİ FONKSİYONUN SONU ---
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -118,47 +214,83 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   keyboardType: TextInputType.emailAddress,
                   autofillHints: const [AutofillHints.email],
+                  enabled: !_isLoading,
                 ),
                 const SizedBox(height: 16),
 
                 // Şifre alanı (Değişiklik yok)
+                // Şifre alanı (Görünürlük ikonu eklendi)
                 TextField(
                   controller: _passwordController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration( // const ifadesini kaldırıyoruz
                     labelText: 'Şifre',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.lock),
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.lock),
+                    // Sona eklenecek ikon (suffixIcon)
+                    suffixIcon: IconButton(
+                      // İkonun ne olacağını _isPasswordVisible durumuna göre belirle
+                      icon: Icon(
+                        _isPasswordVisible
+                            ? Icons.visibility_off // Eğer görünürse, "gizle" ikonu
+                            : Icons.visibility,   // Eğer gizliyse, "göster" ikonu
+                      ),
+                      // İkona tıklandığında...
+                      onPressed: () {
+                        // Durumu güncellemek ve arayüzü yeniden çizmek için setState kullan
+                        setState(() {
+                          // Mevcut durumun tersini ata (true ise false, false ise true yap)
+                          _isPasswordVisible = !_isPasswordVisible;
+                        });
+                      },
+                    ),
                   ),
-                  obscureText: true, // Şifreyi gizle
+                  // obscureText (yazıyı gizleme) durumunu state'imize bağla
+                  obscureText: !_isPasswordVisible,
                   autofillHints: const [AutofillHints.password],
-                  // Enter'a basınca giriş yapsın
                   onSubmitted: (_) => _signIn(),
+                  enabled: !_isLoading,
                 ),
 
                 // --- YENİ EKLENEN WIDGET: CHECKBOX ---
                 // Şifre alanı ile hata mesajı arasına ekledik.
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: CheckboxListTile(
-                    title: const Text(
-                      'Oturumu açık tut',
-                      style: TextStyle(fontSize: 14, color: Colors.grey),
-                    ),
-                    // Checkbox'ın değeri, _rememberMe state'imize (durumumuza) bağlı
-                    value: _rememberMe,
-                    // Checkbox'a tıklandığında...
-                    onChanged: (bool? value) {
-                      // setState (durumu ayarla) çağırarak ekranı güncelle
-                      // ve _rememberMe değişkenine yeni değeri ata.
-                      // value null (boş) gelirse 'false' (yanlış) ata.
-                      setState(() {
-                        _rememberMe = value ?? false;
-                      });
-                    },
-                    // Checkbox'ın kutusunu yazının soluna al
-                    controlAffinity: ListTileControlAffinity.leading,
-                    contentPadding: EdgeInsets.zero, // Kenar boşluklarını sıfırla
-                    activeColor: Colors.indigoAccent, // Temayla uyumlu renk
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Oturumu açık tut Checkbox'ı (Onay Kutusu)
+                      Expanded(
+                        child: CheckboxListTile(
+                          title: const Text(
+                            'Oturumu açık tut',
+                            style: TextStyle(fontSize: 14, color: Colors.grey),
+                          ),
+                          value: _rememberMe,
+                          onChanged: _isLoading ? null : (bool? value) { // Bu satırı GÜNCELLE (Adım 3'e bak)
+                            setState(() {
+                              _rememberMe = value ?? false;
+                            });
+                          },
+                          controlAffinity: ListTileControlAffinity.leading,
+                          contentPadding: EdgeInsets.zero,
+                          activeColor: Colors.indigoAccent,
+                        ),
+                      ),
+
+                      // --- YENİ EKLENECEK BUTON ---
+                      TextButton(
+                        // Yükleniyorsa butonu pasif yap
+                        onPressed: _isLoading ? null : _resetPassword,
+                        child: const Text(
+                          'Şifremi unuttum?',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.indigoAccent,
+                          ),
+                        ),
+                      ),
+                      // ---------------------------
+                    ],
                   ),
                 ),
                 // ------------------------------------
