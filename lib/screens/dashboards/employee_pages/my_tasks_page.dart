@@ -3,9 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:gorev_takip_app_web/widgets/get_user_name.dart';
 
-// Bu, eski 'EmployeeDashboard' (Çalışan Paneli) widget'ımızın (bileşen)
-// 'Scaffold' (İskele) ve 'AppBar' (Üst Çubuk) kısmı çıkarılmış,
-// sadece içeriğe odaklanmış halidir.
 class MyTasksPage extends StatefulWidget {
   const MyTasksPage({super.key});
 
@@ -19,6 +16,7 @@ class _MyTasksPageState extends State<MyTasksPage> {
   @override
   void initState() {
     super.initState();
+    // Mevcut kullanıcı kimliğini (ID) al
     currentUserId = FirebaseAuth.instance.currentUser!.uid;
   }
 
@@ -26,28 +24,32 @@ class _MyTasksPageState extends State<MyTasksPage> {
   Stream<QuerySnapshot> _getMyTasksStream() {
     return FirebaseFirestore.instance
         .collection('tasks')
+    // 'assignedTo' (atanan kişi) alanı 'currentUserId' (mevcut kullanıcı kimliği) olan
         .where('assignedTo', isEqualTo: currentUserId)
+    // VE 'status' (durum) alanı 'archived' (arşivlendi) olmayan
+        .where('status', isNotEqualTo: 'archived')
         .snapshots();
+    // NOT: Bu birleşik sorgu (compound query) için Firebase'in
+    // bir 'index' (dizin) oluşturulmasını istemesi muhtemeldir.
+    // Hata alırsanız, konsoldaki linke tıklayarak 'index'i (dizin) oluşturun.
   }
 
-  // --- YENİ FONKSİYON: GÖREVİ TAMAMLA ---
-  // "Görevi Tamamla" butonuna basıldığında, görevin durumunu ('status') günceller.
+  // Görevin durumunu ('status') güncelleyen fonksiyon
+  // Bu fonksiyon zaten esnek olduğu için (yeni durumu 'newStatus'
+  // parametresiyle alır) değişikliğe gerek yok.
   Future<void> _updateTaskStatus(
       String taskId, String newStatus, String taskTitle) async {
     try {
-      // 'tasks' (görevler) koleksiyonuna git, 'doc' (doküman) metoduyla
-      // 'taskId' (görev kimliği) ile eşleşen dokümanı bul
-      // ve 'update' (güncelle) komutuyla 'status' (durum) alanını değiştir.
       await FirebaseFirestore.instance
           .collection('tasks')
           .doc(taskId)
           .update({
         'status': newStatus,
-        // TODO: Buraya bir 'completedAt' (tamamlanma tarihi) zaman damgası eklenebilir.
+        if (newStatus == 'completed')
+          'completedAt': FieldValue.serverTimestamp()
       });
 
       if (mounted) {
-        // Başarı mesajı göster
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('"$taskTitle" görevi "$newStatus" olarak güncellendi.'),
@@ -56,7 +58,6 @@ class _MyTasksPageState extends State<MyTasksPage> {
         );
       }
     } catch (e) {
-      // Hata olursa göster
       debugPrint("Görev durumu güncellenirken hata: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -89,7 +90,7 @@ class _MyTasksPageState extends State<MyTasksPage> {
   String _getTurkishStatus(String status) {
     switch (status) {
       case 'pending':
-        return 'Bekliyor';
+        return 'Bekliyor'; // (Başlamadı)
       case 'in_progress':
         return 'Devam Ediyor';
       case 'completed':
@@ -100,20 +101,17 @@ class _MyTasksPageState extends State<MyTasksPage> {
         return 'Bilinmiyor';
     }
   }
-  // --- Fonksiyonlar burada bitiyor ---
 
   @override
   Widget build(BuildContext context) {
-    // Bu 'widget' (bileşen) artık bir 'Scaffold' (İskele) döndürmüyor,
-    // doğrudan içeriği döndürüyor.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Başlık
+        // Başlık (Aynen kaldı)
         const Padding(
           padding: EdgeInsets.all(16.0),
           child: Text(
-            'Bana Atanan Görevler',
+            'Aktif Görevlerim',
             style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
           ),
         ),
@@ -124,25 +122,35 @@ class _MyTasksPageState extends State<MyTasksPage> {
             stream: _getMyTasksStream(),
             builder:
                 (BuildContext context, AsyncSnapshot<QuerySnapshot> snapshot) {
+
+              // Yüklenme, Hata ve Boş Liste durumları (Aynen kaldı)
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
               if (snapshot.hasError) {
-                return Center(child: Text('Bir hata oluştu: ${snapshot.error}'));
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Text(
+                      'Görevler yüklenemedi. (Firebase Index (Dizin) hatası olabilir, konsolu kontrol edin)\n\nHata: ${snapshot.error}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.redAccent),
+                    ),
+                  ),
+                );
               }
               if (snapshot.hasData && snapshot.data!.docs.isEmpty) {
                 return const Center(
                   child: Text(
-                    'Size atanmış herhangi bir görev bulunamadı.',
+                    'Size atanmış aktif bir görev bulunamadı.',
                     style: TextStyle(fontSize: 16, color: Colors.grey),
                   ),
                 );
               }
 
+              // Veri geldiyse Listeyi oluştur
               if (snapshot.hasData) {
                 final tasks = snapshot.data!.docs;
-
-                // 'ListView' (Liste Görünümü) (Aynen kaldı)
                 return ListView.builder(
                   padding: const EdgeInsets.all(16.0),
                   itemCount: tasks.length,
@@ -159,6 +167,7 @@ class _MyTasksPageState extends State<MyTasksPage> {
                         : taskData['description'];
                     final String createdById = taskData['createdBy'] ?? '';
 
+                    // Görev Kartı (Card)
                     return Card(
                       shape: RoundedRectangleBorder(
                         side: BorderSide(
@@ -176,7 +185,8 @@ class _MyTasksPageState extends State<MyTasksPage> {
                           children: [
                             // 1. Satır: Başlık ve Durum (Aynen kaldı)
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              mainAxisAlignment:
+                              MainAxisAlignment.spaceBetween,
                               children: [
                                 Expanded(
                                   child: Text(
@@ -248,17 +258,35 @@ class _MyTasksPageState extends State<MyTasksPage> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.end,
                               children: [
-                                // --- GÜNCELLENEN BUTON ---
-                                // Eğer görev zaten 'completed' (tamamlandı) değilse
-                                // 'Görevi Tamamla' butonunu göster
-                                if (status != 'completed')
+                                // --- GÜNCELLENEN EYLEM BÖLÜMÜ ---
+                                // Sizin akışınıza (flow) göre güncellendi.
+
+                                // Eğer durum 'pending' (bekliyor) VEYA
+                                // 'needs_revision' (revize gerekli) ise:
+                                if (status == 'pending' || status == 'needs_revision')
                                   ElevatedButton(
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.green,
+                                      backgroundColor: Colors.blueAccent, // "Başla" butonu mavi
                                     ),
                                     onPressed: () {
-                                      // Görevin durumunu ('status') 'completed' (tamamlandı)
-                                      // olarak güncelleyen fonksiyonu çağır
+                                      // Durumu 'in_progress' (devam ediyor) yap
+                                      _updateTaskStatus(
+                                        taskId,
+                                        'in_progress', // Yeni durum
+                                        taskTitle,
+                                      );
+                                    },
+                                    child: const Text('Çalışmaya Başla'),
+                                  ),
+
+                                // Eğer durum 'in_progress' (devam ediyor) ise:
+                                if (status == 'in_progress')
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.green, // "Tamamla" butonu yeşil
+                                    ),
+                                    onPressed: () {
+                                      // Durumu 'completed' (tamamlandı) yap
                                       _updateTaskStatus(
                                         taskId,
                                         'completed', // Yeni durum
@@ -266,11 +294,21 @@ class _MyTasksPageState extends State<MyTasksPage> {
                                       );
                                     },
                                     child: const Text('Görevi Tamamla'),
-                                  )
-                                // TODO: Admin'in 'Revize Gerekli'
-                                // (needs_revision) durumuna alması
-                                // ihtimaline karşı buraya 'Devam Et'
-                                // (in_progress) butonu da eklenebilir.
+                                  ),
+
+                                // Eğer durum 'completed' (tamamlandı) ise:
+                                if (status == 'completed')
+                                  const Padding(
+                                    padding: EdgeInsets.only(right: 8.0),
+                                    child: Text(
+                                      'Admin Onayı Bekleniyor...',
+                                      style: TextStyle(
+                                        color: Colors.green,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                  ),
+                                // ---------------------------------
                               ],
                             )
                           ],
