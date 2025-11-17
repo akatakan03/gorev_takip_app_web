@@ -1,39 +1,98 @@
 import 'package:flutter/material.dart';
-// Ortak AppBar'ı import et
 import 'package:gorev_takip_app_web/widgets/common_app_bar.dart';
 
-// --- Admin Paneli ---
-class AdminDashboard extends StatelessWidget {
+// Yeni oluşturduğumuz sayfaları import ediyoruz
+import 'package:gorev_takip_app_web/screens/dashboards/admin_pages/employee_list_page.dart';
+import 'package:gorev_takip_app_web/screens/dashboards/admin_pages/all_tasks_page.dart';
+import 'package:gorev_takip_app_web/screens/dashboards/admin_pages/reports_page.dart';
+
+// --- YENİ EKLENEN IMPORT ---
+// Yeni çalışan ekleme diyalogumuzu import ediyoruz.
+import 'package:gorev_takip_app_web/widgets/add_employee_dialog.dart';
+// -----------------------------
+
+class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
+
+  @override
+  State<AdminDashboard> createState() => _AdminDashboardState();
+}
+
+class _AdminDashboardState extends State<AdminDashboard> {
+  int _selectedIndex = 0;
+
+  static const List<Widget> _adminPages = <Widget>[
+    EmployeeListPage(),   // Index 0
+    AllTasksPage(),       // Index 1
+    ReportsPage(),        // Index 2
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const CommonAppBar(title: 'Admin Paneli'), // Ortak AppBar'ı kullan
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.admin_panel_settings,
-                size: 80, color: Colors.indigoAccent),
-            const SizedBox(height: 16),
-            const Text(
-              'Hoşgeldiniz, Admin!',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            const Text('Çalışanları yönetebilir ve görev atayabilirsiniz.'),
-            // TODO: Buraya çalışan listesi, görev atama butonu vb. gelecek.
-          ],
-        ),
+      appBar: const CommonAppBar(title: 'Admin Paneli'),
+      body: Row(
+        children: <Widget>[
+          // Sol Navigasyon Menüsü (NavigationRail)
+          NavigationRail(
+            selectedIndex: _selectedIndex,
+            onDestinationSelected: (int index) {
+              setState(() {
+                _selectedIndex = index;
+              });
+            },
+            extended: false,
+            labelType: NavigationRailLabelType.all,
+            destinations: const <NavigationRailDestination>[
+              NavigationRailDestination(
+                icon: Icon(Icons.group_outlined),
+                selectedIcon: Icon(Icons.group),
+                label: Text('Çalışanlar'),
+              ),
+              NavigationRailDestination(
+                icon: Icon(Icons.task_alt_outlined),
+                selectedIcon: Icon(Icons.task_alt),
+                label: Text('Görevler'),
+              ),
+              NavigationRailDestination(
+                icon: Icon(Icons.bar_chart_outlined),
+                selectedIcon: Icon(Icons.bar_chart),
+                label: Text('Raporlar'),
+              ),
+            ],
+          ),
+
+          const VerticalDivider(thickness: 1, width: 1),
+
+          // Ana İçerik Alanı
+          Expanded(
+            child: _adminPages[_selectedIndex],
+          ),
+        ],
       ),
-      floatingActionButton: FloatingActionButton(
+
+      // Floating Action Button (Yeni Çalışan Ekle)
+      floatingActionButton: _selectedIndex == 0
+          ? FloatingActionButton.extended(
+        icon: const Icon(Icons.person_add),
+        label: const Text('Yeni Çalışan Ekle'),
+        // --- GÜNCELLENEN KISIM BURASI ---
         onPressed: () {
-          // TODO: Yeni çalışan ekleme veya görev oluşturma ekranı
+          // Ekranda 'AddEmployeeDialog' widget'ımızı gösteren
+          // bir diyalog açıyoruz.
+          showDialog(
+            context: context,
+            // Diyalogun dışına tıklayarak kapatılmasını engelle (isteğe bağlı)
+            barrierDismissible: false,
+            builder: (BuildContext context) {
+              // Yeni oluşturduğumuz widget'ı çağırıyoruz.
+              return const AddEmployeeDialog();
+            },
+          );
         },
-        tooltip: 'Yeni Görev / Çalışan Ekle',
-        child: const Icon(Icons.add),
-      ),
+        // -----------------------------
+      )
+          : null, // Diğer sayfalarda FAB görünmesin.
     );
   }
 }
