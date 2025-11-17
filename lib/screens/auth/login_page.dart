@@ -19,6 +19,12 @@ class _LoginPageState extends State<LoginPage> {
   // Hata mesajını göstermek için
   String? _errorMessage;
 
+  // --- YENİ EKLENEN STATE ---
+  // "Oturumu açık tut" checkbox'ının (onay kutusunun) durumunu
+  // tutmak için bir boolean (doğru/yanlış) değişken.
+  bool _rememberMe = false;
+  // -------------------------
+
   // Giriş yapma fonksiyonu
   Future<void> _signIn() async {
     // Butonun "yükleniyor" durumuna geçmesini sağla
@@ -28,6 +34,17 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
+      // --- YENİ GÜNCELLEME: OTURUM SÜREKLİLİĞİ (PERSISTENCE) ---
+      // Giriş yapma (signInWithEmailAndPassword) işleminden ÖNCE
+      // oturumun kalıcılık türünü ayarlamamız gerekiyor.
+      await FirebaseAuth.instance.setPersistence(
+        // Eğer _rememberMe (beni hatırla) 'true' (doğru) ise,
+        // kalıcılık türünü Persistence.LOCAL (Yerel) olarak ayarla.
+        // Değilse, Persistence.SESSION (Oturum) olarak ayarla.
+        _rememberMe ? Persistence.LOCAL : Persistence.SESSION,
+      );
+      // ----------------------------------------------------
+
       // Firebase Auth'u kullanarak Eposta ve Şifre ile giriş yapmayı dene
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(), // Baştaki/sondaki boşlukları sil
@@ -35,6 +52,7 @@ class _LoginPageState extends State<LoginPage> {
       );
       // Not: Giriş başarılı olursa, StreamBuilder (AuthGate) bunu
       // otomatik olarak algılayacak ve bizi HomePage'e yönlendirecek.
+
     } on FirebaseAuthException catch (e) {
       // Eğer Firebase'den bir hata dönerse (örn: "user-not-found")
       debugPrint('Giriş hatası: ${e.code}');
@@ -56,6 +74,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   // Firebase hata kodlarını Türkçe'ye çeviren yardımcı fonksiyon
+  // (Bu fonksiyonda değişiklik yok)
   String _getErrorMessage(String code) {
     switch (code) {
       case 'user-not-found':
@@ -89,7 +108,7 @@ class _LoginPageState extends State<LoginPage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // E-posta alanı
+                // E-posta alanı (Değişiklik yok)
                 TextField(
                   controller: _emailController,
                   decoration: const InputDecoration(
@@ -102,7 +121,7 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 const SizedBox(height: 16),
 
-                // Şifre alanı
+                // Şifre alanı (Değişiklik yok)
                 TextField(
                   controller: _passwordController,
                   decoration: const InputDecoration(
@@ -116,10 +135,39 @@ class _LoginPageState extends State<LoginPage> {
                   onSubmitted: (_) => _signIn(),
                 ),
 
+                // --- YENİ EKLENEN WIDGET: CHECKBOX ---
+                // Şifre alanı ile hata mesajı arasına ekledik.
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: CheckboxListTile(
+                    title: const Text(
+                      'Oturumu açık tut',
+                      style: TextStyle(fontSize: 14, color: Colors.grey),
+                    ),
+                    // Checkbox'ın değeri, _rememberMe state'imize (durumumuza) bağlı
+                    value: _rememberMe,
+                    // Checkbox'a tıklandığında...
+                    onChanged: (bool? value) {
+                      // setState (durumu ayarla) çağırarak ekranı güncelle
+                      // ve _rememberMe değişkenine yeni değeri ata.
+                      // value null (boş) gelirse 'false' (yanlış) ata.
+                      setState(() {
+                        _rememberMe = value ?? false;
+                      });
+                    },
+                    // Checkbox'ın kutusunu yazının soluna al
+                    controlAffinity: ListTileControlAffinity.leading,
+                    contentPadding: EdgeInsets.zero, // Kenar boşluklarını sıfırla
+                    activeColor: Colors.indigoAccent, // Temayla uyumlu renk
+                  ),
+                ),
+                // ------------------------------------
+
                 // Hata mesajını göstermek için
+                // (Görünürlüğü _errorMessage'a bağlı)
                 if (_errorMessage != null)
                   Padding(
-                    padding: const EdgeInsets.only(top: 16.0),
+                    padding: const EdgeInsets.only(top: 8.0), // Üst boşluğu azalttık
                     child: Text(
                       _errorMessage!,
                       style: const TextStyle(
@@ -130,7 +178,7 @@ class _LoginPageState extends State<LoginPage> {
 
                 const SizedBox(height: 24),
 
-                // Giriş Butonu
+                // Giriş Butonu (Değişiklik yok)
                 _isLoading
                     ? const CircularProgressIndicator() // Yükleniyorsa animasyon
                     : SizedBox(
