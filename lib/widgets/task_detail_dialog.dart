@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:gorev_takip_app_web/widgets/get_user_name.dart';
+// --- YENİ IMPORT: Firma Adı Getirici ---
+import 'package:gorev_takip_app_web/widgets/get_company_name.dart';
 import 'package:intl/intl.dart';
 
 class TaskDetailDialog extends StatelessWidget {
@@ -13,45 +15,30 @@ class TaskDetailDialog extends StatelessWidget {
     required this.taskId,
   });
 
-  // Renk ve Metin fonksiyonları (Değişiklik yok)
   Color _getStatusColor(String status) {
     switch (status) {
-      case 'pending':
-        return Colors.orangeAccent;
-      case 'in_progress':
-        return Colors.blueAccent;
-      case 'completed':
-        return Colors.green;
-      case 'needs_revision':
-        return Colors.redAccent;
-      case 'archived':
-        return Colors.grey[700]!;
-      default:
-        return Colors.grey;
+      case 'pending': return Colors.orangeAccent;
+      case 'in_progress': return Colors.blueAccent;
+      case 'completed': return Colors.green;
+      case 'needs_revision': return Colors.redAccent;
+      case 'archived': return Colors.grey[700]!;
+      default: return Colors.grey;
     }
   }
 
   String _getTurkishStatus(String status) {
     switch (status) {
-      case 'pending':
-        return 'Bekliyor';
-      case 'in_progress':
-        return 'Devam Ediyor';
-      case 'completed':
-        return 'Tamamlandı';
-      case 'needs_revision':
-        return 'Revize Gerekli';
-      case 'archived':
-        return 'Arşivlendi';
-      default:
-        return 'Bilinmiyor';
+      case 'pending': return 'Bekliyor';
+      case 'in_progress': return 'Devam Ediyor';
+      case 'completed': return 'Tamamlandı';
+      case 'needs_revision': return 'Revize Gerekli';
+      case 'archived': return 'Arşivlendi';
+      default: return 'Bilinmiyor';
     }
   }
 
   String _formatTimestamp(Timestamp? timestamp) {
-    if (timestamp == null) {
-      return "N/A";
-    }
+    if (timestamp == null) return "N/A";
     return DateFormat('dd.MM.yyyy HH:mm').format(timestamp.toDate());
   }
 
@@ -65,87 +52,51 @@ class TaskDetailDialog extends StatelessWidget {
     final String? revisionNote = taskData['revision_note'];
     final String assignedToId = taskData['assignedTo'] ?? '';
     final String createdById = taskData['createdBy'] ?? '';
+    final String companyId = taskData['companyId'] ?? ''; // --- YENİ: Firma ID'si ---
     final Timestamp? createdAt = taskData['createdAt'];
     final Timestamp? completedAt = taskData['completedAt'];
 
-    // --- GÜNCELLENDİ: AlertDialog (Uyarı Diyaloğu) Yapısı ---
     return AlertDialog(
-      // 'title' (başlık) ve 'content' (içerik) arasında
-      // daha iyi boşluk kontrolü için 'titlePadding' (başlık dolgusu)
-      // ve 'contentPadding' (içerik dolgusu) kullanıyoruz
       titlePadding: const EdgeInsets.all(20.0),
       contentPadding: const EdgeInsets.symmetric(horizontal: 20.0),
-      // 'actionsPadding' (eylem dolgusu) (Kapat butonu için)
       actionsPadding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
-
-      // Başlık
       title: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(
-            child: Text(
-              title,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.close),
-            onPressed: () => Navigator.of(context).pop(),
-            splashRadius: 20,
-          ),
+          Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20))),
+          IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.of(context).pop(), splashRadius: 20),
         ],
       ),
-
-      // İçerik
       content: SizedBox(
-        // Diyaloğun (Dialog) genişliğini mobil için daha
-        // duyarlı (`responsive` - İngilizce) hale getiriyoruz
-        width: MediaQuery.of(context).size.width * 0.8, // Ekranın %80'i
-        // Yüksekliği kaldırdık, 'SingleChildScrollView' (Tekil Kaydırılabilir)
-        // 'widget'ı (bileşen) ile kendi yüksekliğini kendi belirleyecek
+        width: MediaQuery.of(context).size.width * 0.8,
         child: SingleChildScrollView(
           child: ListBody(
             children: <Widget>[
-              // Durum ('status') Etiketi
+              // Durum Etiketi
               Align(
                 alignment: Alignment.centerLeft,
                 child: Container(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
+                  padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
                   decoration: BoxDecoration(
                     color: _getStatusColor(status).withOpacity(0.2),
                     borderRadius: BorderRadius.circular(4.0),
                   ),
                   child: Text(
                     _getTurkishStatus(status).toUpperCase(),
-                    style: TextStyle(
-                      color: _getStatusColor(status),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(color: _getStatusColor(status), fontWeight: FontWeight.bold, fontSize: 14),
                   ),
                 ),
               ),
               const Divider(height: 24),
 
               // Açıklama
-              const Text(
-                'Açıklama',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
+              const Text('Açıklama', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               const SizedBox(height: 8),
               Text(
                 description,
-                style: TextStyle(
-                  fontSize: 15,
-                  color: Colors.grey[300],
-                  fontStyle: taskData['description']?.isEmpty ?? true
-                      ? FontStyle.italic
-                      : FontStyle.normal,
-                ),
+                style: TextStyle(fontSize: 15, color: Colors.grey[300], fontStyle: taskData['description']?.isEmpty ?? true ? FontStyle.italic : FontStyle.normal),
               ),
 
-              // Revizyon Notu (Aynen kaldı)
+              // Revizyon Notu
               if (revisionNote != null && revisionNote.isNotEmpty) ...[
                 const Divider(height: 24),
                 Container(
@@ -160,17 +111,9 @@ class TaskDetailDialog extends StatelessWidget {
                     children: [
                       const Row(
                         children: [
-                          Icon(Icons.warning_amber_rounded,
-                              color: Colors.redAccent, size: 18),
+                          Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 18),
                           SizedBox(width: 8),
-                          Text(
-                            "Admin (Yönetici) Revizyon Notu:",
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.redAccent,
-                              fontSize: 15,
-                            ),
-                          ),
+                          Text("Admin (Yönetici) Revizyon Notu:", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent, fontSize: 15)),
                         ],
                       ),
                       const SizedBox(height: 8),
@@ -182,16 +125,18 @@ class TaskDetailDialog extends StatelessWidget {
 
               const Divider(height: 24),
 
-              // --- GÜNCELLENDİ: DETAYLAR BÖLÜMÜ ---
-              // Taşan ('Overflowing') 'GridView' (Izgara Görünümü)
-              // kaldırıldı, yerine mobil uyumlu 'Column' (Sütun) geldi.
-              const Text(
-                'Detaylar',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
+              // Detaylar
+              const Text('Detaylar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               const SizedBox(height: 12),
-              // 'ListTile' (Liste Öğesi) kullanarak bilgileri
-              // alt alta daha okunaklı göster
+
+              // --- YENİ: Firma Bilgisi ---
+              _buildDetailItem(
+                Icons.business,
+                "Firma",
+                GetCompanyName(companyId: companyId),
+              ),
+              // ---------------------------
+
               _buildDetailItem(
                 Icons.person_outline,
                 "Atanan Kişi",
@@ -213,27 +158,16 @@ class TaskDetailDialog extends StatelessWidget {
                   "Tamamlanma Tarihi",
                   Text(_formatTimestamp(completedAt)),
                 ),
-              // --- GÜNCELLEME BİTTİ ---
             ],
           ),
         ),
       ),
-      // Kapat Butonu
       actions: <Widget>[
-        TextButton(
-          child: const Text('Kapat'),
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
-        ),
+        TextButton(child: const Text('Kapat'), onPressed: () => Navigator.of(context).pop()),
       ],
     );
   }
 
-  // --- GÜNCELLENDİ: _buildDetailItem (detay öğesi oluştur) ---
-  // Artık 'GridView' (Izgara Görünümü) için değil,
-  // 'ListTile' (Liste Öğesi) benzeri bir 'widget' (bileşen)
-  // oluşturuyor ve 'Padding' (Doldurma) içeriyor.
   Widget _buildDetailItem(IconData icon, String label, Widget valueWidget) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -246,17 +180,10 @@ class TaskDetailDialog extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  label,
-                  style: TextStyle(color: Colors.grey[400], fontSize: 13),
-                ),
+                Text(label, style: TextStyle(color: Colors.grey[400], fontSize: 13)),
                 const SizedBox(height: 2),
                 DefaultTextStyle(
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.white, // Koyu tema için beyaz
-                  ),
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: Colors.white),
                   child: valueWidget,
                 ),
               ],

@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:gorev_takip_app_web/widgets/common_app_bar.dart';
 
-// Sayfaları import et (içeri aktar)
+// Sayfaları import et
 import 'package:gorev_takip_app_web/screens/dashboards/admin_pages/employee_list_page.dart';
 import 'package:gorev_takip_app_web/screens/dashboards/admin_pages/all_tasks_page.dart';
 import 'package:gorev_takip_app_web/screens/dashboards/admin_pages/reports_page.dart';
 import 'package:gorev_takip_app_web/screens/dashboards/admin_pages/archived_tasks_page.dart';
+// --- YENİ IMPORT ---
+import 'package:gorev_takip_app_web/screens/dashboards/admin_pages/companies_list_page.dart';
+// -------------------
 
-// Diyalogları (diyalog pencereleri) import et (içeri aktar)
+// Diyalogları import et
 import 'package:gorev_takip_app_web/widgets/add_employee_dialog.dart';
 import 'package:gorev_takip_app_web/widgets/add_task_dialog.dart';
-
+// --- YENİ IMPORT ---
+import 'package:gorev_takip_app_web/widgets/add_company_dialog.dart';
+// -------------------
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -20,19 +25,19 @@ class AdminDashboard extends StatefulWidget {
 }
 
 class _AdminDashboardState extends State<AdminDashboard> {
-  int _selectedIndex = 0; // Hangi sekmenin seçili olduğunu tutar
+  int _selectedIndex = 0;
 
-  // Gösterilecek sayfaların listesi (Değişiklik yok)
+  // --- GÜNCELLENEN SAYFA LİSTESİ ---
+  // "Raporlar"dan önce "Firmalar"ı ekleyelim, daha mantıklı bir akış olur.
   static const List<Widget> _adminPages = <Widget>[
-    EmployeeListPage(),   // Index 0
-    AllTasksPage(),       // Index 1
-    ReportsPage(),        // Index 2
-    ArchivedTasksPage(),  // Index 3
+    EmployeeListPage(),     // Index 0
+    AllTasksPage(),         // Index 1
+    CompaniesListPage(),    // Index 2 (YENİ: Firmalar)
+    ReportsPage(),          // Index 3
+    ArchivedTasksPage(),    // Index 4
   ];
 
-  // --- YENİ EKLENDİ: Navigasyon Hedefleri Listesi ---
-  // Bu listeyi hem 'NavigationRail' (Yan Navigasyon Çubuğu) hem de
-  // 'BottomNavigationBar' (Alt Navigasyon Çubuğu) için ortak kullanacağız.
+  // --- GÜNCELLENEN NAVİGASYON LİSTESİ ---
   static const List<NavigationRailDestination> _adminDestinations = [
     NavigationRailDestination(
       icon: Icon(Icons.group_outlined),
@@ -44,6 +49,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
       selectedIcon: Icon(Icons.task_alt),
       label: Text('Görevler'),
     ),
+    // --- YENİ SEKME ---
+    NavigationRailDestination(
+      icon: Icon(Icons.business_outlined),
+      selectedIcon: Icon(Icons.business),
+      label: Text('Firmalar'),
+    ),
+    // ------------------
     NavigationRailDestination(
       icon: Icon(Icons.bar_chart_outlined),
       selectedIcon: Icon(Icons.bar_chart),
@@ -55,9 +67,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
       label: Text('Arşiv'),
     ),
   ];
-  // -------------------------------------------------
 
-  // FAB (Kayan Düğme) döndüren fonksiyon (Değişiklik yok)
+  // --- GÜNCELLENEN FAB (Kayan Düğme) MANTIĞI ---
   Widget? _getFabForIndex(int index) {
     switch (index) {
       case 0: // Çalışanlar
@@ -68,9 +79,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             showDialog(
               context: context,
               barrierDismissible: false,
-              builder: (BuildContext context) {
-                return const AddEmployeeDialog();
-              },
+              builder: (BuildContext context) => const AddEmployeeDialog(),
             );
           },
         );
@@ -84,12 +93,25 @@ class _AdminDashboardState extends State<AdminDashboard> {
             showDialog(
               context: context,
               barrierDismissible: false,
-              builder: (BuildContext context) {
-                return const AddTaskDialog();
-              },
+              builder: (BuildContext context) => const AddTaskDialog(),
             );
           },
         );
+
+      case 2: // --- YENİ DURUM: Firmalar ---
+        return FloatingActionButton.extended(
+          icon: const Icon(Icons.add_business),
+          label: const Text('Yeni Firma Ekle'),
+          backgroundColor: Colors.indigoAccent,
+          onPressed: () {
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (BuildContext context) => const AddCompanyDialog(),
+            );
+          },
+        );
+
       default:
         return null;
     }
@@ -97,30 +119,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    // --- YENİ EKLENDİ: LayoutBuilder (Yerleşim Oluşturucu) ---
-    // 'Scaffold' (İskele) 'widget'ımızı (bileşen) bir 'LayoutBuilder' (Yerleşim Oluşturucu)
-    // ile sarmalıyoruz. Bu bize ekranın mevcut genişliğini ('constraints' - (kısıtlamalar)) verir.
     return LayoutBuilder(
       builder: (context, constraints) {
-
-        // Ekran genişliğine göre bir kırılma noktası (breakpoint - (İngilizce)) belirliyoruz.
-        // 600 pikselden darsa, 'isMobile' (mobil) 'true' (doğru) olacak.
         final bool isMobile = constraints.maxWidth < 600;
 
         return Scaffold(
           appBar: const CommonAppBar(title: 'Admin Paneli'),
 
-          // --- GÜNCELLENDİ: body (gövde) ---
-          // 'body' (gövde) artık 'isMobile' (mobil) değişkenine göre değişecek
           body: isMobile
-          // EĞER MOBİL İSE (DAR EKRAN):
-          // 'Row' (Satır) kullanma.
-          // 'NavigationRail' (Yan Navigasyon Çubuğu) gösterme.
-          // Sayfayı doğrudan göster (tam genişlikte).
               ? _adminPages[_selectedIndex]
-
-          // EĞER MOBİL DEĞİLSE (GENİŞ EKRAN):
-          // Eski 'desktop' (masaüstü) 'layout'umuzu (yerleşim) göster.
               : Row(
             children: <Widget>[
               NavigationRail(
@@ -132,7 +139,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 },
                 extended: false,
                 labelType: NavigationRailLabelType.all,
-                // Hedefleri yeni ortak listeden al
                 destinations: _adminDestinations,
               ),
               const VerticalDivider(thickness: 1, width: 1),
@@ -142,46 +148,30 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ],
           ),
 
-          // --- YENİ EKLENDİ: bottomNavigationBar (Alt Navigasyon Çubuğu) ---
-          // Eğer 'isMobile' (mobil) 'true' (doğru) ise, bir
-          // 'BottomNavigationBar' (Alt Navigasyon Çubuğu) göster.
-          // 'false' (yanlış) ise 'null' (boş) ata (gösterme).
           bottomNavigationBar: isMobile
               ? BottomNavigationBar(
-            // 'currentIndex' (mevcut dizin) ve 'onTap' (dokunma)
-            // 'NavigationRail' (Yan Navigasyon Çubuğu) ile aynı 'state'i (durum) kullanır
             currentIndex: _selectedIndex,
             onTap: (int index) {
               setState(() {
                 _selectedIndex = index;
               });
             },
-            // Hedefleri, 'NavigationRailDestination' (Yan Navigasyon Çubuğu Hedefi)
-            // listesinden 'BottomNavigationBarItem' (Alt Navigasyon Çubuğu Öğesi)
-            // listesine dönüştür
             items: _adminDestinations.map((dest) {
               return BottomNavigationBarItem(
                 icon: dest.icon,
                 activeIcon: dest.selectedIcon,
-                label: (dest.label as Text).data, // Metni al
+                label: (dest.label as Text).data,
               );
             }).toList(),
-
-            // ÖNEMLİ: Mobil 'layout'umuzda (yerleşim) 3'ten fazla
-            // ('Raporlar', 'Arşiv') öğe olduğu için, 'type' (tür)
-            // 'fixed' (sabit) olmalıdır, yoksa kaybolurlar.
             type: BottomNavigationBarType.fixed,
-            // Seçili ve seçili olmayan etiketlerin renklerini ayarla
             selectedItemColor: Colors.indigoAccent,
             unselectedItemColor: Colors.grey,
           )
-              : null, // Mobil değilse 'bottomNavigationBar' (alt navigasyon çubuğu) gösterme
+              : null,
 
-          // FAB (Kayan Düğme) (Değişiklik yok, 'Scaffold'a (İskele) bağlı kalır)
           floatingActionButton: _getFabForIndex(_selectedIndex),
         );
       },
     );
-    // --- DEĞİŞİKLİK BURADA BİTİYOR ---
   }
 }
