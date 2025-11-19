@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:gorev_takip_app_web/widgets/common_app_bar.dart';
 
-// Sayfaları import et
+// Sayfalar
 import 'package:gorev_takip_app_web/screens/dashboards/admin_pages/employee_list_page.dart';
 import 'package:gorev_takip_app_web/screens/dashboards/admin_pages/all_tasks_page.dart';
 import 'package:gorev_takip_app_web/screens/dashboards/admin_pages/reports_page.dart';
 import 'package:gorev_takip_app_web/screens/dashboards/admin_pages/archived_tasks_page.dart';
-// --- YENİ IMPORT ---
 import 'package:gorev_takip_app_web/screens/dashboards/admin_pages/companies_list_page.dart';
-// -------------------
+import 'package:gorev_takip_app_web/screens/dashboards/admin_pages/calendar_page.dart';
 
-// Diyalogları import et
+// Diyaloglar
 import 'package:gorev_takip_app_web/widgets/add_employee_dialog.dart';
 import 'package:gorev_takip_app_web/widgets/add_task_dialog.dart';
-// --- YENİ IMPORT ---
 import 'package:gorev_takip_app_web/widgets/add_company_dialog.dart';
+// --- YENİ IMPORT ---
+import 'package:gorev_takip_app_web/widgets/add_schedule_dialog.dart';
 // -------------------
 
 class AdminDashboard extends StatefulWidget {
@@ -27,17 +27,15 @@ class AdminDashboard extends StatefulWidget {
 class _AdminDashboardState extends State<AdminDashboard> {
   int _selectedIndex = 0;
 
-  // --- GÜNCELLENEN SAYFA LİSTESİ ---
-  // "Raporlar"dan önce "Firmalar"ı ekleyelim, daha mantıklı bir akış olur.
   static const List<Widget> _adminPages = <Widget>[
     EmployeeListPage(),     // Index 0
     AllTasksPage(),         // Index 1
-    CompaniesListPage(),    // Index 2 (YENİ: Firmalar)
-    ReportsPage(),          // Index 3
-    ArchivedTasksPage(),    // Index 4
+    CalendarPage(),         // Index 2
+    CompaniesListPage(),    // Index 3
+    ReportsPage(),          // Index 4
+    ArchivedTasksPage(),    // Index 5
   ];
 
-  // --- GÜNCELLENEN NAVİGASYON LİSTESİ ---
   static const List<NavigationRailDestination> _adminDestinations = [
     NavigationRailDestination(
       icon: Icon(Icons.group_outlined),
@@ -49,13 +47,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
       selectedIcon: Icon(Icons.task_alt),
       label: Text('Görevler'),
     ),
-    // --- YENİ SEKME ---
+    NavigationRailDestination(
+      icon: Icon(Icons.calendar_month_outlined),
+      selectedIcon: Icon(Icons.calendar_month),
+      label: Text('Takvim'),
+    ),
     NavigationRailDestination(
       icon: Icon(Icons.business_outlined),
       selectedIcon: Icon(Icons.business),
       label: Text('Firmalar'),
     ),
-    // ------------------
     NavigationRailDestination(
       icon: Icon(Icons.bar_chart_outlined),
       selectedIcon: Icon(Icons.bar_chart),
@@ -68,7 +69,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
     ),
   ];
 
-  // --- GÜNCELLENEN FAB (Kayan Düğme) MANTIĞI ---
   Widget? _getFabForIndex(int index) {
     switch (index) {
       case 0: // Çalışanlar
@@ -98,7 +98,22 @@ class _AdminDashboardState extends State<AdminDashboard> {
           },
         );
 
-      case 2: // --- YENİ DURUM: Firmalar ---
+      case 2: // --- GÜNCELLENDİ: Takvim ---
+        return FloatingActionButton.extended(
+          icon: const Icon(Icons.videocam_outlined),
+          label: const Text('Çekim Planla'),
+          backgroundColor: Colors.orangeAccent,
+          onPressed: () {
+            // Yeni oluşturduğumuz diyalogu aç
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (BuildContext context) => const AddScheduleDialog(),
+            );
+          },
+        );
+
+      case 3: // Firmalar
         return FloatingActionButton.extended(
           icon: const Icon(Icons.add_business),
           label: const Text('Yeni Firma Ekle'),

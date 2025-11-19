@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-// Artık AuthGate'i buradan import ediyoruz
 import 'package:gorev_takip_app_web/screens/auth/auth_gate.dart';
+// --- ÖNEMLİ: intl paketinin yerelleştirme verilerini yüklemek için gerekli import ---
+import 'package:intl/date_symbol_data_local.dart';
+// --------------------------------------------------
 
-// --- Firebase Yapılandırması (Sizin sağladığınız bilgilerle) ---
 const FirebaseOptions firebaseOptions = FirebaseOptions(
   apiKey: "AIzaSyDn5c3nzB5pB-H-iDDL6ZhG1aDQHRXAVQc",
   authDomain: "gorev-takip-76c3a.firebaseapp.com",
@@ -15,13 +16,19 @@ const FirebaseOptions firebaseOptions = FirebaseOptions(
 );
 
 void main() async {
-  // Flutter binding'lerini başlat
   WidgetsFlutterBinding.ensureInitialized();
-  // Firebase'i sağlanan opsiyonlarla başlat
+
   await Firebase.initializeApp(
     options: firebaseOptions,
   );
-  // Uygulamayı çalıştır
+
+  // --- DÜZELTME BURADA ---
+  // Türkçe tarih formatı (tr_TR) için gerekli verileri başlatıyoruz.
+  // Bu satır olmadan DateFormat('...', 'tr_TR') hata verir.
+  // 'null' parametresini geçmek, varsayılan olarak gerekli verileri yükler.
+  await initializeDateFormatting('tr_TR', null);
+  // -----------------------
+
   runApp(const MyApp());
 }
 
@@ -31,14 +38,13 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Görev Takip Uygulaması',
+      title: 'Görev Takip',
       theme: ThemeData(
         primarySwatch: Colors.indigo,
-        brightness: Brightness.dark, // Koyu tema
+        brightness: Brightness.dark,
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      debugShowCheckedModeBanner: false, // Debug etiketini kaldır
-      // Ana ekran olarak AuthGate'i (kimlik kapısını) belirle
+      debugShowCheckedModeBanner: false,
       home: const AuthGate(),
     );
   }
